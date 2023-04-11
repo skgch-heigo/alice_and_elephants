@@ -26,6 +26,11 @@ logging.basicConfig(level=logging.INFO, filename='my_log.log')
 # то мы уберем одну подсказку. Как будто что-то меняется :)
 sessionStorage = {}
 
+agreed = ['ладно',
+          'куплю',
+          'покупаю',
+          'хорошо']
+
 
 @app.route('/post', methods=['POST'])
 # Функция получает тело запроса и возвращает ответ.
@@ -68,7 +73,7 @@ def handle_dialog(req, res):
                 "Не хочу.",
                 "Не буду.",
                 "Отстань!",
-            ]
+            ], "game": "elephant", "started": 0
         }
         # Заполняем текст ответа
         res['response']['text'] = 'Привет! Купи слона!'
@@ -84,21 +89,50 @@ def handle_dialog(req, res):
     # Если он написал 'ладно', 'куплю', 'покупаю', 'хорошо',
     # то мы считаем, что пользователь согласился.
     # Подумайте, всё ли в этом фрагменте написано "красиво"?
-    if req['request']['original_utterance'].lower() in [
-        'ладно',
-        'куплю',
-        'покупаю',
-        'хорошо'
-    ]:
-        # Пользователь согласился, прощаемся.
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
-        return
+    if sessionStorage[user_id]["game"] == "elephant":
+        agreeded = False
+        for i in agreed:
+            if i in req['request']['original_utterance'].lower():
+                agreeded = True
+                break
+        if agreeded:
+            # Пользователь согласился, прощаемся.
+            res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
+            sessionStorage[user_id]["game"] = "rabbit"
+            sessionStorage[user_id]['suggests'] = [
+                    "Не хочу.",
+                    "Не буду.",
+                    "Отстань!",
+                ]
+            # res['response']['end_session'] = True
+            return
 
-    # Если нет, то убеждаем его купить слона!
-    res['response']['text'] = \
-        f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
-    res['response']['buttons'] = get_suggests(user_id)
+        # Если нет, то убеждаем его купить слона!
+        res['response']['text'] = \
+            f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
+        res['response']['buttons'] = get_suggests(user_id)
+    else:
+        if not sessionStorage[user_id]["started"]:
+            sessionStorage[user_id]["started"] = 1
+            res['response']['text'] = 'Привет! Купи кролика!'
+            # Получим подсказки
+            res['response']['buttons'] = get_suggests(user_id)
+            return
+        agreeded = False
+        for i in agreed:
+            if i in req['request']['original_utterance'].lower():
+                agreeded = True
+                break
+        if agreeded:
+            # Пользователь согласился, прощаемся.
+            res['response']['text'] = 'Кролика можно найти на Яндекс.Маркете!'
+            res['response']['end_session'] = True
+            return
+
+        # Если нет, то убеждаем его купить слона!
+        res['response']['text'] = \
+            f"Все говорят '{req['request']['original_utterance']}', а ты купи кролика!"
+        res['response']['buttons'] = get_suggests(user_id)
 
 
 # Функция возвращает две подсказки для ответа.
@@ -120,7 +154,7 @@ def get_suggests(user_id):
     if len(suggests) < 2:
         suggests.append({
             "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
+            "url": f"https://market.yandex.ru/search?text={'слон' if session['game'] == 'elephant' else 'кролик'}",
             "hide": True
         })
 
